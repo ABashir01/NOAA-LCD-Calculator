@@ -1,5 +1,5 @@
-#TODO: ADD ERROR HANDLING FOR EACH THING
 #TODO: If I wanna speed the whole thing up, I need to set file paths in the init function and only update upon file browsing in the GUI
+#TODO: Add a README for others
 
 # These are all part of Python's standard library (not external/3rd-party)
 import sys
@@ -34,41 +34,59 @@ class WeatherCalc:
                 date_arr[x] = date_arr[x][2:]
 
         # formats date into M/D/Y format (as in the CSV files)
-        return date_arr[1] + '/' + date_arr[2] + '/' + date_arr[0]
+        try:
+            ret = date_arr[1] + '/' + date_arr[2] + '/' + date_arr[0]
+        except:
+            ret = "Error"
+
+        return ret
 
 
     def daylight_temp(self, csv_file, date):
         formatted_date = self.date_format_helper(date)
 
+        if formatted_date == "Error":
+            return "Date Error"
+
         temp_data = []
-        with open(csv_file, newline='') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                csv_date_and_time_info = row["DATE"].split()
-                csv_date = csv_date_and_time_info[0]
+        try:
+            with open(csv_file, newline='') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    try:
+                        csv_date_and_time_info = row["DATE"].split()
+                    
+                        csv_date = csv_date_and_time_info[0]
 
-                # must convert csv_time into format comparable to sunrise/sunset
-                csv_time = int(csv_date_and_time_info[1].replace(':', ''))
-                csv_sunrise = int(row["DAILYSunrise"])
-                csv_sunset = int(row["DAILYSunset"])
+                        # must convert csv_time into format comparable to sunrise/sunset
+                        csv_time = int(csv_date_and_time_info[1].replace(':', ''))
+                        csv_sunrise = int(row["DAILYSunrise"])
+                        csv_sunset = int(row["DAILYSunset"])
 
-                # data added to list if same date and between sunrise and sunset and
-                # the temp data is not M (missing) or blank
-                if csv_date == formatted_date and \
-                    csv_sunrise < csv_time < csv_sunset and row[
-                    "HOURLYDRYBULBTEMPF"] != ('M' and ''):
+                        # data added to list if same date and between sunrise and sunset and
+                        # the temp data is not M (missing) or blank
+                        if csv_date == formatted_date and \
+                            csv_sunrise < csv_time < csv_sunset and row[
+                            "HOURLYDRYBULBTEMPF"] != ('M' and ''):
 
-                    # Removes the suspect value indicator ('s') if it is part of the
-                    # data (specifically just removes non-number characters)
-                    csv_temp = re.sub("[^0-9]", '', row["HOURLYDRYBULBTEMPF"])
+                            # Removes the suspect value indicator ('s') if it is part of the
+                            # data (specifically just removes non-number characters)
+                            csv_temp = re.sub("[^0-9]", '', row["HOURLYDRYBULBTEMPF"])
 
-                    temp_data.append(float(csv_temp))
+                            temp_data.append(float(csv_temp))
 
-        # handles the case that no data was added to the temp_data
-        if (len(temp_data) == 0):
-            sys.stdout.write('0'+'\n')
-            sys.stdout.write('0')
-            return [0, 0]
+                    except:
+                        return "File Error"
+        
+        except:
+            return "File Error"
+
+        # handles the case that no data was added to the temp_data (the inputted date has no data/valid data)
+        if len(temp_data) == 0:
+            # sys.stdout.write('0'+'\n')
+            # sys.stdout.write('0')
+            # return [0, 0]
+            return "Date has no valid data"
 
         # finds the average and std dev using the built-in statistics library
         average_temp = statistics.mean(temp_data)
@@ -87,42 +105,53 @@ class WeatherCalc:
     def windchills(self, csv_file, date):
         formatted_date = self.date_format_helper(date)
 
+        if formatted_date == "Error":
+            return "Date Error"
+
         windchill_data = []
-        with open(csv_file, newline='') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                csv_date = row["DATE"].split()[0]
+        try:
 
-                # checks if temperature data exists
-                if (row["HOURLYDRYBULBTEMPF"] != ('M' and '')):
+            with open(csv_file, newline='') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    csv_date = row["DATE"].split()[0]
 
-                    # removes suspect value indicator ('s')
-                    # we use dry bulb temp because that is air temp (which is used
-                    # in wind chill formula)
-                    csv_temp = float(
-                        re.sub("[^0-9]", '', row["HOURLYDRYBULBTEMPF"]))
-                else:
-                    csv_temp = '*'  # sets csv_temp value to * if data doesn't exist
+                    # checks if temperature data exists
+                    if (row["HOURLYDRYBULBTEMPF"] != ('M' and '')):
 
-                # data added to list if same date, temperature data exists,
-                # temperature is less than 40, and wind speed data exists
-                if csv_date == formatted_date and csv_temp != '*' and \
-                    csv_temp <= 40 and row["HOURLYWindSpeed"] != ('M' and ''):
+                        # removes suspect value indicator ('s')
+                        # we use dry bulb temp because that is air temp (which is used
+                        # in wind chill formula)
+                        csv_temp = float(
+                            re.sub("[^0-9]", '', row["HOURLYDRYBULBTEMPF"]))
+                    else:
+                        csv_temp = '*'  # sets csv_temp value to * if data doesn't exist
 
-                    csv_wind_velocity = float(
-                        re.sub("[^0-9]", '', row["HOURLYWindSpeed"]))
+                    # data added to list if same date, temperature data exists,
+                    # temperature is less than 40, and wind speed data exists
+                    if csv_date == formatted_date and csv_temp != '*' and \
+                        csv_temp <= 40 and row["HOURLYWindSpeed"] != ('M' and ''):
 
-                    # formula taken from LCD_documentation.pdf
-                    calculated_windchill = 35.74 + 0.6215 * \
-                        (csv_temp) - 35.75*(csv_wind_velocity**0.16) + \
-                        0.4275*(csv_temp)*(csv_wind_velocity**0.16)
+                        csv_wind_velocity = float(
+                            re.sub("[^0-9]", '', row["HOURLYWindSpeed"]))
 
-                    # rounds the calculated_windchill to the closest integer
-                    calculated_windchill = round(calculated_windchill)
+                        # formula taken from LCD_documentation.pdf
+                        calculated_windchill = 35.74 + 0.6215 * \
+                            (csv_temp) - 35.75*(csv_wind_velocity**0.16) + \
+                            0.4275*(csv_temp)*(csv_wind_velocity**0.16)
 
-                    # Info written to stdout (terminal) and added to data array
-                    sys.stdout.write(str(calculated_windchill)+'\n')
-                    windchill_data.append(float(calculated_windchill))
+                        # rounds the calculated_windchill to the closest integer
+                        calculated_windchill = round(calculated_windchill)
+
+                        # Info written to stdout (terminal) and added to data array
+                        sys.stdout.write(str(calculated_windchill)+'\n')
+                        windchill_data.append(float(calculated_windchill))
+        
+        except:
+            return "File Error"
+        
+        if len(windchill_data) == 0:
+            return "Date has no valid data"
 
         # I opted to return a list rather than using yield and returning a generator
         # object because there is a pretty limited number of data points per day +
@@ -248,69 +277,73 @@ class WeatherCalc:
 
     def similar_day(self, csv_file_1, csv_file_2):
 
-        # initializes both of our full file dicts using a helper
-        file_1_dict = self.file_dict_helper(csv_file_1)
-        file_2_dict = self.file_dict_helper(csv_file_2)
+        try:
+            # initializes both of our full file dicts using a helper
+            file_1_dict = self.file_dict_helper(csv_file_1)
+            file_2_dict = self.file_dict_helper(csv_file_2)
 
-        # initializes the most_similar_date as an empty string and the
-        # lowest_similarity_score as the maximum size
-        most_similar_date = ""
-        lowest_similarity_score = sys.maxsize
+            # initializes the most_similar_date as an empty string and the
+            # lowest_similarity_score as the maximum size
+            most_similar_date = ""
+            lowest_similarity_score = sys.maxsize
 
-        # for loop that goes through every date and checks if it has a lower
-        # similarity score than the current lowest and then updates the date
-        # accordingly
-        for date in file_1_dict:
-            if date in file_2_dict:  # checks if the date exists in both dicts
+            # for loop that goes through every date and checks if it has a lower
+            # similarity score than the current lowest and then updates the date
+            # accordingly
+            for date in file_1_dict:
+                if date in file_2_dict:  # checks if the date exists in both dicts
 
-                # setting difference of averages values using a helper
-                avg_dry_bulb_temp_diff = self.avg_diff_helper(
-                    file_1_dict, file_2_dict, date, "DRY BULB TEMPS")
-                avg_wet_bulb_temp_diff = self.avg_diff_helper(
-                    file_1_dict, file_2_dict, date, "WET BULB TEMPS")
-                avg_humidity_diff = self.avg_diff_helper(
-                    file_1_dict, file_2_dict, date, "RELATIVE HUMIDITIES")
-                avg_pressure_diff = self.avg_diff_helper(
-                    file_1_dict, file_2_dict, date, "STATION PRESSURES")
-                avg_altimeter_diff = self.avg_diff_helper(
-                    file_1_dict, file_2_dict, date, "ALTIMETER SETTINGS")
-                avg_wind_vector_u_component_diff = self.avg_diff_helper(
-                    file_1_dict, file_2_dict, date, "WIND VECTOR U COMPONENTS")
-                avg_wind_vector_v_component_diff = self.avg_diff_helper(
-                    file_1_dict, file_2_dict, date, "WIND VECTOR V COMPONENTS")
+                    # setting difference of averages values using a helper
+                    avg_dry_bulb_temp_diff = self.avg_diff_helper(
+                        file_1_dict, file_2_dict, date, "DRY BULB TEMPS")
+                    avg_wet_bulb_temp_diff = self.avg_diff_helper(
+                        file_1_dict, file_2_dict, date, "WET BULB TEMPS")
+                    avg_humidity_diff = self.avg_diff_helper(
+                        file_1_dict, file_2_dict, date, "RELATIVE HUMIDITIES")
+                    avg_pressure_diff = self.avg_diff_helper(
+                        file_1_dict, file_2_dict, date, "STATION PRESSURES")
+                    avg_altimeter_diff = self.avg_diff_helper(
+                        file_1_dict, file_2_dict, date, "ALTIMETER SETTINGS")
+                    avg_wind_vector_u_component_diff = self.avg_diff_helper(
+                        file_1_dict, file_2_dict, date, "WIND VECTOR U COMPONENTS")
+                    avg_wind_vector_v_component_diff = self.avg_diff_helper(
+                        file_1_dict, file_2_dict, date, "WIND VECTOR V COMPONENTS")
 
-                # the formula for similarity scores (explained in 
-                # README_solution.txt)
-                weighted_summation = 0.25 * avg_dry_bulb_temp_diff + 0.25 * \
-                    avg_wet_bulb_temp_diff + 0.125 * avg_humidity_diff + 0.075 * \
-                    avg_pressure_diff + 0.05 * avg_altimeter_diff + 0.125 * \
-                    avg_wind_vector_u_component_diff + 0.125 * \
-                        avg_wind_vector_v_component_diff
+                    # the formula for similarity scores (explained in 
+                    # README_solution.txt)
+                    weighted_summation = 0.25 * avg_dry_bulb_temp_diff + 0.25 * \
+                        avg_wet_bulb_temp_diff + 0.125 * avg_humidity_diff + 0.075 * \
+                        avg_pressure_diff + 0.05 * avg_altimeter_diff + 0.125 * \
+                        avg_wind_vector_u_component_diff + 0.125 * \
+                            avg_wind_vector_v_component_diff
 
-                # if the value is lower than the current lowest score, updates 
-                # values
-                if weighted_summation < lowest_similarity_score:
-                    most_similar_date = date
-                    lowest_similarity_score = weighted_summation
+                    # if the value is lower than the current lowest score, updates 
+                    # values
+                    if weighted_summation < lowest_similarity_score:
+                        most_similar_date = date
+                        lowest_similarity_score = weighted_summation
 
-        # changing the date into the correct format
-        similar_date_arr = most_similar_date.split('/')
-        for x in range(len(similar_date_arr)):
-            if x == len(similar_date_arr) - 1:  # index where the year value is
+            # changing the date into the correct format
+            similar_date_arr = most_similar_date.split('/')
+            for x in range(len(similar_date_arr)):
+                if x == len(similar_date_arr) - 1:  # index where the year value is
 
-                # we have to assume that we are in the 2000s, as that is when the
-                # csv files take place and the csv files only give us the last 2
-                # digits of the year
-                similar_date_arr[x] = "20" + similar_date_arr[x]
+                    # we have to assume that we are in the 2000s, as that is when the
+                    # csv files take place and the csv files only give us the last 2
+                    # digits of the year
+                    similar_date_arr[x] = "20" + similar_date_arr[x]
 
-            # if the month or day are only of a length of a 1, adds a 0 to the front
-            # ,so they fit format expectations
-            elif len(similar_date_arr[x]) == 1:
-                similar_date_arr[x] = "0" + similar_date_arr[x]
+                # if the month or day are only of a length of a 1, adds a 0 to the front
+                # ,so they fit format expectations
+                elif len(similar_date_arr[x]) == 1:
+                    similar_date_arr[x] = "0" + similar_date_arr[x]
 
-        # sets most_similar_date to the correctly formatted form of the date
-        most_similar_date = similar_date_arr[2] + '-' + \
-            similar_date_arr[0] + '-' + similar_date_arr[1]
+            # sets most_similar_date to the correctly formatted form of the date
+            most_similar_date = similar_date_arr[2] + '-' + \
+                similar_date_arr[0] + '-' + similar_date_arr[1]
+        
+        except:
+            return "Similar Day Files Error"
 
         # write the value to stdout and also returns it
         sys.stdout.write(most_similar_date)

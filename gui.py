@@ -17,6 +17,31 @@ layout_home = [[sg.VPush()],
 form = sg.FlexForm("Home", size=(500, 400))
 form.Layout(layout_home)
 
+def invalid_file_error(error_type):
+
+    if error_type == "Date Error":
+        message = "Please format your date as: 'YYYY-MM-DD'"
+    elif error_type == "Date has no valid data":
+        message = "Please input a date in the dataset"
+    elif error_type == "File Error":
+        message = "Please input a valid NOAA LCD CSV file"
+    elif error_type == "Similar Day Files Error":
+        message = "Please input valid NOAA LCD CSV files"
+    elif error_type == "Similar Day Same File":
+        message = "Please input two different files"
+    else:
+        return 0
+
+    layout = [[sg.Text("ERROR!")], [sg.Text(message)], [sg.Text()], [sg.Push(), sg.Button("OK")]]
+    error_window = sg.Window("ERROR!", layout, modal=True)
+    while True:
+        event, values = error_window.read()
+        if event == sg.WINDOW_CLOSED or event=="OK":
+            break
+    
+    error_window.close()
+    return 1
+
 def open_second_page(calc: WeatherCalc):
     layout = [[sg.Text("Daylight Temperature Average and Standard Deviation")], 
                 [sg.Text("LCD Data File: ", size=(13,1)), sg.Input(key="file", **bw), sg.FileBrowse()],
@@ -26,14 +51,17 @@ def open_second_page(calc: WeatherCalc):
                 [sg.Text("Average:", size=(13,1)), sg.Input(key="avg_output",  **bw, readonly=True)],
                 [sg.Text("Standard Dev:", size=(13,1)), sg.Input(key="std_dev_output",  **bw, readonly=True)]]
     window = sg.Window("Daylight Temp Average and Standard Deviation", layout, modal=True)
+
     while True:
         event, values = window.read()
         if event == sg.WINDOW_CLOSED:
             break
         elif event == "Calculate":
             ret = calc.daylight_temp(window["file"].get(), window["date"].get())
-            window["avg_output"].update(str(ret[0])+"° F")
-            window["std_dev_output"].update(str(ret[1])+"° F")
+            invalid_check = invalid_file_error(ret)
+            if invalid_check == 0:
+                window["avg_output"].update(str(ret[0])+"° F")
+                window["std_dev_output"].update(str(ret[1])+"° F")
 
     
     window.close()
@@ -46,17 +74,20 @@ def open_third_page(calc: WeatherCalc):
                 [sg.Text("")], #Spacer
                 [sg.Text("Windchills:", size=(13,1)), sg.Input(key="output", **bw, readonly=True)]]
     window = sg.Window("Windchills When Temperature Below 40° F", layout, modal=True)
+
     while True:
         event, values = window.read()
         if event == sg.WINDOW_CLOSED:
             break
         elif event == "Calculate":
             ret = calc.windchills(window["file"].get(), window["date"].get())
-            ret_str = ""
-            for chill in ret:
-                ret_str += str(chill) + "° F\n"
+            invalid_check = invalid_file_error(ret)
+            if invalid_check == 0:
+                ret_str = ""
+                for chill in ret:
+                    ret_str += str(chill) + "° F\n"
 
-            window["output"].update(ret_str)
+                window["output"].update(ret_str)
     
     window.close()
 
@@ -68,13 +99,19 @@ def open_fourth_page(calc: WeatherCalc):
                 [sg.Text("")], #Spacer
                 [sg.Text("Most Similar Day:", size=(13,1), ), sg.Input(key="output", **bw, readonly=True)]]
     window = sg.Window("Most Similar Day:", layout, modal=True)
+
     while True:
         event, values = window.read()
         if event == sg.WINDOW_CLOSED:
             break
         elif event == "Calculate":
+            if window["file1"].get() == window["file2"].get():
+                invalid_file_error("Similar Day Same File")
+
             ret = calc.similar_day(window["file1"].get(), window["file2"].get())
-            window["output"].update(ret)   
+            invalid_check = invalid_file_error(ret)
+            if invalid_check == 0:
+                window["output"].update(ret)   
 
     window.close()
 
