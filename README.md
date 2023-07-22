@@ -3,10 +3,10 @@ This is a small calculator with a functions and a GUI using PySimpleGUI that cal
 # "Avg + Std Dev Daylight Temp": 
 This function takes an LCD dataset and a date and returns the average and sample standard deviation of the Fahrenheit dry-bulb temperature between the times of sunrise and sunset.
 
-# Windchills for Temps Sub-40
+# "Windchills for Temps Sub-40":
 This function takes an LCD dataset and a date and returns the wind chills rounded to the nearest integer for the times when the temperature is less than or equal to 40 degrees Fahrenheit.
 
-# Most Similar Day
+# "Most Similar Day":
 This function takes two LCD datasets and returns the most similar day calculated based on the following explanation:
 
 similar_day was basically centered around my ideas around what constituted a good way to check similarity between two days.
